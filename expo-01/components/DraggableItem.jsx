@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Dimensions, StyleSheet, Text } from "react-native";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -7,11 +7,10 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-export function DraggableItem({ item }) {
+export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
   const initialX = useSharedValue(0);
   const initialY = useSharedValue(0);
   const itemRef = useRef(null);
@@ -26,29 +25,57 @@ export function DraggableItem({ item }) {
       if (itemRef.current) {
         itemRef.current.measure(updatePosition);
       }
-    }, 500); // Delay para garantir layout
+    }, 500);
     return () => clearTimeout(timeoutId);
   }, []);
 
   const gesture = Gesture.Pan()
+    .onBegin(() => {
+      scale.value = withSpring(1.05);
+    })
     .onUpdate((event) => {
       translateX.value = event.translationX;
       translateY.value = event.translationY;
     })
     .onEnd((event) => {
-      // TODO: Implementar lógica de encaixe e retorno aqui (para o aluno):
-      // 1. Calcular posição final do centro do item:
-      //    const finalX = initialX.value + event.translationX;
-      //    const finalY = initialY.value + event.translationY;
-      // 2. Comparar com bounds das drop zones (receber como props ou Context):
-      //    ex: if (finalX > gostoLeft && finalX < gostoRight && finalY > gostoTop && finalY < gostoBottom)
-      // 3. Se encaixa, animar para posição alvo na zone:
-      //    translateX.value = withSpring(gostoCenterX - initialX.value);
-      //    translateY.value = withSpring(gostoCenterY - initialY.value);
-      //    // Opcional: callback para adicionar item à zone
-      // 4. Senão, retornar à origem:
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
+      // 1. Calcula a posição atual do centro do item
+      const finalX = initialX.value + event.translationX;
+      const finalY = initialY.value + event.translationY;
+
+      let snapped = false;
+
+      // 2. Verifica colisão com a zona "Gosto"
+      if (
+        gostoBounds &&
+        finalX > gostoBounds.left &&
+        finalX < gostoBounds.right &&
+        finalY > gostoBounds.top &&
+        finalY < gostoBounds.bottom
+      ) {
+        translateX.value = withSpring(gostoBounds.centerX - initialX.value);
+        translateY.value = withSpring(gostoBounds.centerY - initialY.value);
+        snapped = true;
+      }
+      // 3. Verifica colisão com a zona "Não Gosto"
+      else if (
+        naoGostoBounds &&
+        finalX > naoGostoBounds.left &&
+        finalX < naoGostoBounds.right &&
+        finalY > naoGostoBounds.top &&
+        finalY < naoGostoBounds.bottom
+      ) {
+        translateX.value = withSpring(naoGostoBounds.centerX - initialX.value);
+        translateY.value = withSpring(naoGostoBounds.centerY - initialY.value);
+        snapped = true;
+      }
+
+      if (!snapped) {
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      }
+    })
+    .onFinalize(() => {
+      scale.value = withSpring(1);
     });
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -56,14 +83,20 @@ export function DraggableItem({ item }) {
       transform: [
         { translateX: translateX.value },
         { translateY: translateY.value },
+        { scale: scale.value }
       ],
     };
   });
 
   return (
     <GestureDetector gesture={gesture}>
-      <Animated.View ref={itemRef} style={[styles.item, animatedStyle]}>
-        <Text style={styles.itemText}>{item}</Text>
+      <Animated.View style={[styles.item, animatedStyle]}>
+        <View 
+          ref={itemRef} 
+          style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+        >
+          <Text style={styles.itemText}>{item}</Text>
+        </View>
       </Animated.View>
     </GestureDetector>
   );
