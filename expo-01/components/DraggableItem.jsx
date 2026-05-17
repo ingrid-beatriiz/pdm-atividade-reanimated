@@ -13,8 +13,13 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
+
   const initialX = useSharedValue(0);
   const initialY = useSharedValue(0);
+
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+
   const itemRef = useRef(null);
 
   const updatePosition = (fx, fy, width, height, px, py) => {
@@ -27,22 +32,26 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
       if (itemRef.current) {
         itemRef.current.measure(updatePosition);
       }
-    }, 500); 
+    }, 500);
     return () => clearTimeout(timeoutId);
   }, []);
 
+
   const gesture = Gesture.Pan()
-    .onStart((_event, context) => {
-      context.startX = translateX.value;
-      context.startY = translateY.value;
-      // Animação visual de toque
+    .onStart(() => {
+
+      startX.value = translateX.value;
+      startY.value = translateY.value;
+      
       scale.value = withTiming(1.05, { duration: 100 });
     })
-    .onUpdate((event, context) => {
-      translateX.value = context.startX + event.translationX;
-      translateY.value = context.startY + event.translationY;
+    .onUpdate((event) => {
+
+      translateX.value = startX.value + event.translationX;
+      translateY.value = startY.value + event.translationY;
     })
-    .onEnd((_event, context) => {
+    .onEnd((_event) => {
+  
       const visualX = initialX.value + translateX.value;
       const visualY = initialY.value + translateY.value;
 
@@ -70,12 +79,14 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
         translateY.value = withSpring(naoGostoBounds.centerY - initialY.value);
         snapped = true;
       }
+
       if (!snapped) {
         translateX.value = withTiming(0, { duration: 300 });
         translateY.value = withTiming(0, { duration: 300 });
       }
     })
     .onFinalize(() => {
+  
       scale.value = withTiming(1, { duration: 100 });
     });
 
@@ -92,7 +103,6 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.item, animatedStyle]}>
-   
         <View
           ref={itemRef}
           style={{
@@ -111,8 +121,8 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
 
 const styles = StyleSheet.create({
   item: {
-    height: 44, 
-    paddingHorizontal: 16, 
+    height: 44,
+    paddingHorizontal: 16,
     backgroundColor: "#FF6B6B",
     borderRadius: 22,
     justifyContent: "center",
