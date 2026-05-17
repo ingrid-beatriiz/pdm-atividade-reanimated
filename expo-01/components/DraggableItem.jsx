@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 
 export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
+
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -25,57 +27,56 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
       if (itemRef.current) {
         itemRef.current.measure(updatePosition);
       }
-    }, 500);
+    }, 500); 
     return () => clearTimeout(timeoutId);
   }, []);
 
   const gesture = Gesture.Pan()
-    .onBegin(() => {
-      scale.value = withSpring(1.05);
+    .onStart((_event, context) => {
+      context.startX = translateX.value;
+      context.startY = translateY.value;
+      // Animação visual de toque
+      scale.value = withTiming(1.05, { duration: 100 });
     })
-    .onUpdate((event) => {
-      translateX.value = event.translationX;
-      translateY.value = event.translationY;
+    .onUpdate((event, context) => {
+      translateX.value = context.startX + event.translationX;
+      translateY.value = context.startY + event.translationY;
     })
-    .onEnd((event) => {
-      // 1. Calcula a posição atual do centro do item
-      const finalX = initialX.value + event.translationX;
-      const finalY = initialY.value + event.translationY;
+    .onEnd((_event, context) => {
+      const visualX = initialX.value + translateX.value;
+      const visualY = initialY.value + translateY.value;
 
       let snapped = false;
 
-      // 2. Verifica colisão com a zona "Gosto"
       if (
         gostoBounds &&
-        finalX > gostoBounds.left &&
-        finalX < gostoBounds.right &&
-        finalY > gostoBounds.top &&
-        finalY < gostoBounds.bottom
+        visualX > gostoBounds.left &&
+        visualX < gostoBounds.right &&
+        visualY > gostoBounds.top &&
+        visualY < gostoBounds.bottom
       ) {
         translateX.value = withSpring(gostoBounds.centerX - initialX.value);
         translateY.value = withSpring(gostoBounds.centerY - initialY.value);
         snapped = true;
       }
-      // 3. Verifica colisão com a zona "Não Gosto"
       else if (
         naoGostoBounds &&
-        finalX > naoGostoBounds.left &&
-        finalX < naoGostoBounds.right &&
-        finalY > naoGostoBounds.top &&
-        finalY < naoGostoBounds.bottom
+        visualX > naoGostoBounds.left &&
+        visualX < naoGostoBounds.right &&
+        visualY > naoGostoBounds.top &&
+        visualY < naoGostoBounds.bottom
       ) {
         translateX.value = withSpring(naoGostoBounds.centerX - initialX.value);
         translateY.value = withSpring(naoGostoBounds.centerY - initialY.value);
         snapped = true;
       }
-
       if (!snapped) {
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
+        translateX.value = withTiming(0, { duration: 300 });
+        translateY.value = withTiming(0, { duration: 300 });
       }
     })
     .onFinalize(() => {
-      scale.value = withSpring(1);
+      scale.value = withTiming(1, { duration: 100 });
     });
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -83,7 +84,7 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
       transform: [
         { translateX: translateX.value },
         { translateY: translateY.value },
-        { scale: scale.value }
+        { scale: scale.value },
       ],
     };
   });
@@ -91,9 +92,15 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.item, animatedStyle]}>
-        <View 
-          ref={itemRef} 
-          style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+   
+        <View
+          ref={itemRef}
+          style={{
+            width: "100%",
+            height: "100%",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
         >
           <Text style={styles.itemText}>{item}</Text>
         </View>
@@ -104,12 +111,13 @@ export function DraggableItem({ item, gostoBounds, naoGostoBounds }) {
 
 const styles = StyleSheet.create({
   item: {
-    width: 80,
-    height: 80,
+    height: 44, 
+    paddingHorizontal: 16, 
     backgroundColor: "#FF6B6B",
-    borderRadius: 40,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+    margin: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -119,7 +127,8 @@ const styles = StyleSheet.create({
   itemText: {
     color: "white",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 14,
+    textAlign: "center",
   },
 });
 
